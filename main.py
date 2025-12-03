@@ -32,7 +32,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https:deinweihnachstbaum.de",
-        "https:www.deinweihnachstbaum.de"
+        "https:www.deinweihnachstbaum.de",
+        "https:api.deinweihnachstbaum.de"
     ],
     allow_credentials=True,
     allow_methods=["*"],
