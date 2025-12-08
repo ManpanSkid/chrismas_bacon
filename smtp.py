@@ -9,8 +9,8 @@ from models import Order
 def send_email(to_address: str, subject: str, body: str):
     host = os.getenv("SMTP_HOST")
     port = int(os.getenv("SMTP_PORT", 587))
-    user = os.getenv("SMTP_USER")
-    password = os.getenv("SMTP_PASSWORD")
+    user = os.getenv("SMTP_INFO")
+    password = os.getenv("SMTP_INFO_PW")
 
     try:
         msg = EmailMessage()

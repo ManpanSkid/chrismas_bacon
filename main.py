@@ -31,9 +31,9 @@ app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https:deinweihnachstbaum.de",
-        "https:www.deinweihnachstbaum.de",
-        "https:api.deinweihnachstbaum.de"
+        "https://deinweihnachstbaum.de",
+        "https://www.deinweihnachstbaum.de",
+        "https://api.deinweihnachstbaum.de"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -77,3 +77,7 @@ async def get_order(order_id: str):
 @app.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
     return await stripe_payment.stripe_webhook(request)
+
+@app.post("/paypal/webhook")
+async def stripe_webhook(request: Request):
+    return await paypal_payment.paypal_webhook(request)

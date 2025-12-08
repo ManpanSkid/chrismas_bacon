@@ -57,8 +57,6 @@ async def stripe_webhook(request: Request):
 
         metadata = session.get("metadata", {})
 
-        print("metadata", metadata)
-
         order_id = metadata.get("request_id")
         if not order_id:
             logging.error("Invalid metadata checkout")

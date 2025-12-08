@@ -1,121 +1,121 @@
-import json
 import logging
 import os
-import requests
 from fastapi import Request, HTTPException
-from db import order_service
+import paypalrestsdk
+from paypalrestsdk.notifications import WebhookEvent
 
 import in_memory
-import smtp
-from models import Order
 from payments.helper import complete_payment
 
 logger = logging.getLogger(__name__)
 
-def get_paypal_token():
-    url = f"{os.getenv("PAYPAL_BASE")}/v1/oauth2/token"
-    response = requests.post(
-        url,
-        auth=(os.getenv("PAYPAL_CLIENT_ID"), os.getenv("PAYPAL_SECRET")),
-        data={"grant_type": "client_credentials"}
-    )
-    return response.json()["access_token"]
 
+async def create_checkout(order):
+    paypalrestsdk.configure({
+        "mode": os.getenv("PAYPAL_MODE", "sandbox"),  # sandbox or live
+        "client_id": os.getenv("PAYPAL_CLIENT_ID"),
+        "client_secret": os.getenv("PAYPAL_CLIENT_SECRET")
+    })
 
-def verify_webhook_signature(headers, body):
-    validate_url = f"{os.getenv("PAYPAL_BASE")}/v1/notifications/verify-webhook-signature"
-    token = get_paypal_token()
-
-    data = {
-        "auth_algo": headers.get("paypal-auth-algo"),
-        "cert_url": headers.get("paypal-cert-url"),
-        "transmission_id": headers.get("paypal-transmission-id"),
-        "transmission_sig": headers.get("paypal-transmission-sig"),
-        "transmission_time": headers.get("paypal-transmission-time"),
-        "webhook_id": "YOUR_WEBHOOK_ID",  # From PayPal dashboard
-        "webhook_event": json.loads(body)
-    }
-
-    response = requests.post(
-        validate_url,
-        json=data,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {token}",
+    payment = paypalrestsdk.Payment({
+        "intent": "sale",
+        "payer": {
+            "payment_method": "paypal"
         },
-    )
-
-    status = response.json().get("verification_status")
-    return status == "SUCCESS"
-
-
-def create_order(order: Order):
-    token = get_paypal_token()
-    url = f"{os.getenv("PAYPAL_BASE")}/v2/checkout/orders"
-
-    payload = {
-        "request_id": order.id,
-        "purchase_units": [
-            {
-                "amount": {"currency_code": "EUR", "value": order.price}
-            }
-        ],
-        "application_context": {
-            "brand_name": "Dein Weihnachtsbaum",
-            "return_url": "https://your-domain.com/paypal/success",
-            "cancel_url": "https://your-domain.com/paypal/cancel",
-        }
-    }
-
-    response = requests.post(
-        url,
-        json=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {token}",
+        "redirect_urls": {
+            "return_url": os.getenv("SUCCESS_URL"),
+            "cancel_url": os.getenv("CANCEL_URL")
         },
-    )
+        "transactions": [{
+            "item_list": {
+                "items": [{
+                    "name": "FastAPI PayPal Checkout",
+                    "sku": "item",
+                    "price": f"{order.price:.2f}",
+                    "currency": "EUR",
+                    "quantity": 1
+                }]
+            },
+            "amount": {
+                "total": f"{order.price:.2f}",
+                "currency": "EUR"
+            },
+            "description": "FastAPI PayPal Checkout",
+            "custom": order.id,  # Store order ID in custom field
+            "invoice_number": order.id
+        }],
+        "note_to_payer": f"Customer email: {order.customer.email}"
+    })
 
-    json_response = response.json()
+    if payment.create():
+        in_memory.new_order(order)
+        # Return approval URL for redirect
+        for link in payment.links:
+            if link.rel == "approval_url":
+                return {"approval_url": link.href, "payment_id": payment.id}
+    else:
+        logging.error(f"PayPal payment creation error: {payment.error}")
+        raise HTTPException(status_code=400, detail=payment.error)
 
-    # find approval link
-    for link in order["links"]:
-        if link["rel"] == "approve":
-            return link["href"]
 
-    return "No approve link found"
+async def stripe_webhook(request: Request):
+    # Configure PayPal SDK
+    paypalrestsdk.configure({
+        "mode": os.getenv("PAYPAL_MODE", "sandbox"),
+        "client_id": os.getenv("PAYPAL_CLIENT_ID"),
+        "client_secret": os.getenv("PAYPAL_CLIENT_SECRET")
+    })
 
+    payload = await request.body()
 
-async def paypal_webhook(request: Request):
-    raw_body = await request.body()
-    body_str = raw_body.decode("utf-8")
-    headers = request.headers
+    # Get webhook headers
+    transmission_id = request.headers.get("PAYPAL-TRANSMISSION-ID")
+    transmission_time = request.headers.get("PAYPAL-TRANSMISSION-TIME")
+    cert_url = request.headers.get("PAYPAL-CERT-URL")
+    auth_algo = request.headers.get("PAYPAL-AUTH-ALGO")
+    transmission_sig = request.headers.get("PAYPAL-TRANSMISSION-SIG")
+    webhook_id = os.getenv("PAYPAL_WEBHOOK_ID")
 
-    # 1. VERIFY SIGNATURE
-    if not verify_webhook_signature(headers, body_str):
-        raise HTTPException(status_code=400, detail="Invalid signature")
+    if not all([transmission_id, transmission_time, cert_url, auth_algo, transmission_sig, webhook_id]):
+        logging.error("Missing PayPal webhook headers")
+        raise HTTPException(status_code=400, detail="Missing webhook headers")
 
-    event = json.loads(body_str)
-    event_type = event["event_type"]
-    resource = event["resource"]
+    try:
+        # Verify webhook signature using PayPal SDK
+        webhook_event = WebhookEvent.verify(
+            transmission_id=transmission_id,
+            timestamp=transmission_time,
+            webhook_id=webhook_id,
+            event_body=payload.decode('utf-8'),
+            cert_url=cert_url,
+            actual_signature=transmission_sig,
+            auth_algo=auth_algo
+        )
 
-    print("Received PayPal Event:", event_type)
+        # If verification successful, webhook_event will contain the verified event
+        event_type = webhook_event.get("event_type")
+        print("event_type", event_type)
 
-    # 2. HANDLE PAYMENT COMPLETED EVENTS
-    if event_type == "CHECKOUT.ORDER.APPROVED":
-        order_id = resource["id"]
-        print("Order approved:", order_id)
+        if event_type == "PAYMENT.SALE.COMPLETED":
+            logging.info("Received payment sale completed")
 
-    if event_type == "PAYMENT.CAPTURE.COMPLETED":
-        logging.info("Received checkout session completed")
+            # Retrieve resource and custom data
+            resource = webhook_event.get("resource", {})
 
-        capture = resource
-        order_id = capture["request_id"]
-        amount = capture["amount"]["value"]
+            # Get order ID from custom field or invoice_number
+            order_id = resource.get("custom") or resource.get("invoice_number")
 
-        print("Payment completed for order:", order_id)
-        print("Amount:", amount)
+            if not order_id:
+                logging.error("Invalid metadata checkout")
+                raise HTTPException(status_code=400, detail="Missing order ID")
 
-        complete_payment(order_id)
+            complete_payment(order_id)
 
-    return {"status": "ok"}
+        return {"status": "success"}
+
+    except paypalrestsdk.exceptions.UnauthorizedAccess as e:
+        logging.error(f"PayPal webhook signature verification failed: {e}")
+        raise HTTPException(status_code=401, detail="Invalid signature")
+    except Exception as e:
+        logging.error(f"Webhook error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
