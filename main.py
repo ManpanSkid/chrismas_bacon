@@ -33,7 +33,8 @@ app.add_middleware(
     allow_origins=[
         "https://deinweihnachstbaum.de",
         "https://www.deinweihnachstbaum.de",
-        "https://api.deinweihnachstbaum.de"
+        "https://api.deinweihnachstbaum.de",
+        "http://localhost:5173"
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -54,7 +55,8 @@ async def create_checkout_session(order_in: OrderIn):
         checkout_session = await stripe_payment.create_checkout(order)
         checkout_url = checkout_session.url
     elif order.payment_method == PaymentMethod.Paypal:
-        raise HTTPException(status_code=400, detail="Payment method not supported")
+        checkout_session = await paypal_payment.create_checkout(order)
+        checkout_url = checkout_session.url
     else:
         in_memory.new_order(order)
         complete_payment(order.id)
