@@ -71,7 +71,7 @@ async def create_checkout_session(order_in: OrderIn):
 async def get_orders():
     return order_service.get_all_orders()
 
-@app.get("/orders/{order_id}")
+@app.get("/orders/{order_id:path}")
 async def get_order(order_id: str):
     return order_service.get_order(order_id)
 

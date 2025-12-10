@@ -52,7 +52,7 @@ async def create_checkout(order):
         # Return approval URL for redirect
         for link in payment.links:
             if link.rel == "approval_url":
-                return {"approval_url": link.href, "payment_id": payment.id}
+                return {"url": link.href, "payment_id": payment.id}
     else:
         logging.error(f"PayPal payment creation error: {payment.error}")
         raise HTTPException(status_code=400, detail=payment.error)
