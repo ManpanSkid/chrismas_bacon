@@ -13,7 +13,7 @@ def send_email(to_address: str, subject: str, body: str, is_html: bool = False):
     host = os.getenv("SMTP_HOST")
     port = int(os.getenv("SMTP_PORT", 587))
     # Note: I used SMTP_USER/SMTP_INFO as the sender/login
-    user = os.getenv("SMTP_USER") or os.getenv("SMTP_INFO")
+    user = os.getenv("SMTP_INFO")
     password = os.getenv("SMTP_INFO_PW")
 
     if not all([host, user, password]):
