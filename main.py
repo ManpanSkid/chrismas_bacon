@@ -46,9 +46,8 @@ database.init_db()
 @app.post("/checkout")
 async def create_checkout_session(order_in: OrderIn):
     order = Order.from_order_in(order_in)
-
+    order.price = round(order.price, 2)
     logging.info(f"checkout session created by {order.customer.email}, price: {order.price}")
-
     checkout_url = os.getenv("SUCCESS_URL")
 
     if order.payment_method == PaymentMethod.Stripe:
