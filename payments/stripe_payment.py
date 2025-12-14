@@ -47,7 +47,6 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=400)
 
     event_type = event["type"]
-    print("event_type", event_type)
 
     if event_type == "checkout.session.completed":
         logging.info("Received checkout session completed")
@@ -62,6 +61,6 @@ async def stripe_webhook(request: Request):
             logging.error("Invalid metadata checkout")
             raise HTTPException(status_code=400)
 
-        complete_payment(order_id)
+        await complete_payment(order_id)
 
     return {"status": "success"}

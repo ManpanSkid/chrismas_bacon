@@ -54,11 +54,10 @@ async def create_checkout_session(order_in: OrderIn):
         checkout_session = await stripe_payment.create_checkout(order)
         checkout_url = checkout_session.url
     elif order.payment_method == PaymentMethod.Paypal:
-        checkout_session = await paypal_payment.create_checkout(order)
-        checkout_url = checkout_session.url
+        return "Not implemented"
     else:
         in_memory.new_order(order)
-        complete_payment(order.id)
+        await complete_payment(order.id)
 
     return {
         "order_id": order.id,
@@ -79,6 +78,6 @@ async def get_order(order_id: str):
 async def stripe_webhook(request: Request):
     return await stripe_payment.stripe_webhook(request)
 
-@app.post("/paypal/webhook")
-async def stripe_webhook(request: Request):
-    return await paypal_payment.paypal_webhook(request)
+# @app.post("/paypal/webhook")
+# async def stripe_webhook(request: Request):
+#     return await paypal_payment.paypal_webhook(request)

@@ -9,10 +9,11 @@ class Tree(Enum):
 
 
 class Size(Enum):
+    XSmall = "xs"
     Small = "s"
-    Medium = "m"
     Large = "l"
     XLarge = "xl"
+    XXLarge = "xxl"
 
 
 class Package(Enum):
@@ -23,8 +24,8 @@ class Package(Enum):
 
 class Delivery(Enum):
     Standard = "standard"
-    Fast = "fast"
-    Express = "express"
+    Fast = "express"
+    Express = "sofort"
 
 
 class PaymentMethod(Enum):
@@ -55,20 +56,21 @@ class OrderIn(BaseModel):
 priceList = {
     Tree.Nordmann: 1,
 
-    Size.Small: 35.87,
-    Size.Medium: 49.92,
-    Size.Large: 65.76,
-    Size.XLarge: 79.89,
+    Size.Small: 40,
+    Size.XSmall: 50,
+    Size.Large: 60,
+    Size.XLarge: 75,
+    Size.XXLarge: 85,
 
-    Package.Basic: 33.23,
-    Package.Extra: 41.36,
-    Package.Full: 55.78,
+    Package.Basic: 0,
+    Package.Extra: 10,
+    Package.Full: 30,
 
     Delivery.Standard: 0,
-    Delivery.Fast: 8.85,
-    Delivery.Express: 24.67,
+    Delivery.Fast: 10,
+    Delivery.Express: 30,
 
-    "treeStand": 35.99
+    "treeStand": 25
 }
 
 class Order(BaseModel):

@@ -2,8 +2,9 @@ import logging
 import os
 import smtplib
 from email.message import EmailMessage
-from models import Order
+from models import Order, PaymentMethod
 
+logger = logging.getLogger(__name__)
 
 # --- Refactored send_email to support HTML content ---
 def send_email(to_address: str, subject: str, body: str, is_html: bool = False):
@@ -75,14 +76,18 @@ def send_order_success_customer(customer_email: str, order: Order):
 
     # --- Company/Contact Information Placeholders ---
     # In a real app, these would come from env vars or a config file
-    COMPANY_NAME = "Dein Weihnachtsbaum"
+    COMPANY_NAME = "Dein Weihnachtsbaum.de"
     COMPANY_LOGO_URL = "https://www.deinweihnachstbaum.de/logo.png"  # Placeholder
     CONTACT_EMAIL = "info@deinweihnachstbaum.de"
     CONTACT_PHONE = "+49 151 2954 5560"
+    PAYMENT_METHODE = "Bar Zahlung vor Ort"
+
+    if order.payment_method == PaymentMethod.Stripe:
+        PAYMENT_METHODE = "Karten Zahlung"
 
     # --- German Translation and Detail Formatting ---
     tree_stand_status = "Ja" if order.tree_stand else "Nein"
-    delivery_date_str = order.delivery.delivery_date.strftime("%d.%m.%Y")
+    # delivery_date_str = order.delivery.delivery_date.strftime("%d.%m.%Y")
 
     # Generate the HTML email body
     html_body = f"""
@@ -113,8 +118,8 @@ def send_order_success_customer(customer_email: str, order: Order):
             </div>
 
             <div class="content">
-                <p>Sehr geehrte/r Frau/Herr **{order.customer.last_name}**,</p>
-                <p>Vielen Dank für Ihre Bestellung bei **{COMPANY_NAME}**! Ihre Bestellung wurde erfolgreich platziert und wird in Kürze bearbeitet.</p>
+                <p>Sehr geehrte/r Frau/Herr <strong>{order.customer.last_name}</strong>,</p>
+                <p>Vielen Dank für Ihre Bestellung bei <strong>{COMPANY_NAME}</strong>! Ihre Bestellung wurde erfolgreich platziert und wird in Kürze bearbeitet.</p>
 
                 <h2>Zusammenfassung Ihrer Bestellung</h2>
                 <p><strong>Bestell-ID:</strong> <span class="highlight">{order.id}</span></p>
@@ -126,51 +131,47 @@ def send_order_success_customer(customer_email: str, order: Order):
                         <th colspan="2" style="background-color: #e6ffe6;">Ihr Weihnachtsbaum</th>
                     </tr>
                     <tr>
-                        <td>**Baumart:**</td>
+                        <td><strong>Baumart:</strong></td>
                         <td>{order.tree.name}</td>
                     </tr>
                     <tr>
-                        <td>**Größe:**</td>
-                        <td>{order.size.height_cm} cm</td>
+                        <td><strong>Größe:</strong></td>
+                        <td>{order.size.name}</td>
                     </tr>
                     <tr>
-                        <td>**Verpackung:**</td>
-                        <td>{order.package.type}</td>
+                        <td><strong>Lieferumfang:</strong></td>
+                        <td>{order.package.name}</td>
                     </tr>
                     <tr>
-                        <td>**Christbaumständer:**</td>
+                        <td><strong>Christbaumständer:</strong></td>
                         <td>{tree_stand_status}</td>
                     </tr>
                     <tr>
                         <th colspan="2" style="background-color: #e6ffe6;">Liefer- & Zahlungsdetails</th>
                     </tr>
                     <tr>
-                        <td>**Lieferdatum:**</td>
-                        <td>{delivery_date_str}</td>
+                        <td><strong>Lieferadresse:</strong></td>
+                        <td>{order.customer.address}, {order.customer.postal_code} {order.customer.city}</td>
                     </tr>
                     <tr>
-                        <td>**Lieferadresse:**</td>
-                        <td>{order.delivery.street}, {order.delivery.zip_code} {order.delivery.city}</td>
-                    </tr>
-                    <tr>
-                        <td>**Zahlungsmethode:**</td>
-                        <td>{order.payment_method.name}</td>
+                        <td><strong>Zahlungsmethode:</strong></td>
+                        <td>{PAYMENT_METHODE}</td>
                     </tr>
                 </table>
 
                 <p style="text-align: right; font-size: 1.2em;">
-                    **Gesamtbetrag (inkl. MwSt.):** <span class="highlight">{order.price:.2f}€</span>
+                    <strong>Gesamtbetrag (inkl. MwSt.):</strong> <span class="highlight">{order.price:.2f}€</span>
                 </p>
 
                 <p>Wir werden Sie benachrichtigen, sobald Ihre Bestellung versandbereit ist und die Lieferung erfolgt.</p>
                 <p>Bei Fragen zu Ihrer Bestellung, antworten Sie einfach auf diese E-Mail oder kontaktieren Sie uns unter den unten angegebenen Kontaktdaten.</p>
 
                 <p>Mit freundlichen Grüßen,</p>
-                <p>Ihr Team von **{COMPANY_NAME}**</p>
+                <p>Ihr Team von <strong>{COMPANY_NAME}</strong></p>
             </div>
 
             <div class="footer">
-                <p>**Kontakt:**</p>
+                <p><strong>Kontakt:</strong></p>
                 <p>E-Mail: <a href="mailto:{CONTACT_EMAIL}">{CONTACT_EMAIL}</a></p>
                 <p>Telefon: {CONTACT_PHONE}</p>
             </div>
