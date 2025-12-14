@@ -1,49 +1,46 @@
 import logging
 import os
-import smtplib
-from email.message import EmailMessage
 from models import Order, PaymentMethod
+import resend
 
 logger = logging.getLogger(__name__)
 
-# --- Refactored send_email to support HTML content ---
+# Initialize Resend with API key from environment
+resend.api_key = os.getenv("RESEND_API_KEY")
+
+
+# --- Refactored send_email to use Resend API ---
 def send_email(to_address: str, subject: str, body: str, is_html: bool = False):
     """
-    Sends an email, supporting both plain text and HTML content.
+    Sends an email using Resend API, supporting both plain text and HTML content.
     """
-    host = os.getenv("SMTP_HOST")
-    port = int(os.getenv("SMTP_PORT", 587))
-    # Note: I used SMTP_USER/SMTP_INFO as the sender/login
-    user = os.getenv("SMTP_INFO")
-    password = os.getenv("SMTP_INFO_PW")
+    from_email = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
 
-    if not all([host, user, password]):
-        logging.error("Missing one or more SMTP environment variables (HOST, USER, PW).")
+    if not resend.api_key:
+        logging.error("Missing RESEND_API_KEY environment variable.")
+        return
+
+    if not from_email:
+        logging.error("Missing RESEND_FROM_EMAIL environment variable.")
         return
 
     try:
-        msg = EmailMessage()
-        msg["From"] = user
-        msg["To"] = to_address
-        msg["Subject"] = subject
-
-        if is_html:
-            msg.set_content("Bitte aktivieren Sie HTML, um diese E-Mail anzuzeigen.", subtype="plain")
-            msg.add_alternative(body, subtype="html")
-        else:
-            msg.set_content(body)
-
         logging.info(f"Attempting to send email to {to_address} with subject: {subject}")
 
-        with smtplib.SMTP(host, port) as smtp:
-            # Standard TLS setup for many providers
-            smtp.ehlo()
-            smtp.starttls()
-            smtp.ehlo()
-            smtp.login(user, password)
-            smtp.send_message(msg)
+        params = {
+            "from": from_email,
+            "to": [to_address],
+            "subject": subject,
+        }
 
-        logging.info(f"Email successfully sent to {to_address}.")
+        if is_html:
+            params["html"] = body
+            params["text"] = "Bitte aktivieren Sie HTML, um diese E-Mail anzuzeigen."
+        else:
+            params["text"] = body
+
+        response = resend.Emails.send(params)
+        logging.info(f"Email successfully sent to {to_address}. Response: {response}")
 
     except Exception as e:
         logging.error(f"Email send failed for {to_address}: {e}")
@@ -52,16 +49,18 @@ def send_email(to_address: str, subject: str, body: str, is_html: bool = False):
 # --- Original Admin Email (unchanged for German translation) ---
 def send_new_order_received_admin(order: Order):
     """Sends a plain text notification email to the admin."""
-    # Assuming SMTP_USER is the admin's email for simplicity,
-    # or you might want a separate ADMIN_EMAIL env var.
-    admin_email = os.getenv("SMTP_USER")
+    admin_email = os.getenv("ADMIN_EMAIL")
 
-    subject = "Neue Bestellung Eingegangen"  # Translated for better internal consistency
+    if not admin_email:
+        logging.error("Missing ADMIN_EMAIL environment variable.")
+        return
+
+    subject = "Neue Bestellung Eingegangen"
     body = (
         f"Eine neue Bestellung wurde aufgegeben.\n\n"
         f"Bestell-ID: {order.id}\n"
         f"Kunde: {order.customer.first_name} {order.customer.last_name}\n"
-        f"Gesamtbetrag: {order.price:.2f}€\n"  # Formatted for two decimal places
+        f"Gesamtbetrag: {order.price:.2f}€\n"
     )
 
     send_email(admin_email, subject, body)
@@ -75,9 +74,8 @@ def send_order_success_customer(customer_email: str, order: Order):
     subject = "Ihre Bestellung war erfolgreich! | Bestell-Nr. " + order.id
 
     # --- Company/Contact Information Placeholders ---
-    # In a real app, these would come from env vars or a config file
     COMPANY_NAME = "Dein Weihnachtsbaum.de"
-    COMPANY_LOGO_URL = "https://www.deinweihnachstbaum.de/logo.png"  # Placeholder
+    COMPANY_LOGO_URL = "https://www.deinweihnachstbaum.de/logo.png"
     CONTACT_EMAIL = "info@deinweihnachstbaum.de"
     CONTACT_PHONE = "+49 151 2954 5560"
     PAYMENT_METHODE = "Barzahlung vor Ort"
@@ -87,7 +85,6 @@ def send_order_success_customer(customer_email: str, order: Order):
 
     # --- German Translation and Detail Formatting ---
     tree_stand_status = "Ja" if order.tree_stand else "Nein"
-    # delivery_date_str = order.delivery.delivery_date.strftime("%d.%m.%Y")
 
     # Generate the HTML email body
     html_body = f"""
@@ -180,5 +177,4 @@ def send_order_success_customer(customer_email: str, order: Order):
     </html>
     """
 
-    # Pass is_html=True to send_email
     send_email(customer_email, subject, html_body, is_html=True)
