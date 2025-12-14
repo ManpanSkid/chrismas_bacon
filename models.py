@@ -56,8 +56,8 @@ class OrderIn(BaseModel):
 priceList = {
     Tree.Nordmann: 1,
 
-    Size.Small: 40,
-    Size.XSmall: 50,
+    Size.XSmall: 40,
+    Size.Small: 50,
     Size.Large: 60,
     Size.XLarge: 75,
     Size.XXLarge: 85,
