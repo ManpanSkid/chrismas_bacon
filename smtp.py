@@ -80,10 +80,10 @@ def send_order_success_customer(customer_email: str, order: Order):
     COMPANY_LOGO_URL = "https://www.deinweihnachstbaum.de/logo.png"  # Placeholder
     CONTACT_EMAIL = "info@deinweihnachstbaum.de"
     CONTACT_PHONE = "+49 151 2954 5560"
-    PAYMENT_METHODE = "Bar Zahlung vor Ort"
+    PAYMENT_METHODE = "Barzahlung vor Ort"
 
     if order.payment_method == PaymentMethod.Stripe:
-        PAYMENT_METHODE = "Karten Zahlung"
+        PAYMENT_METHODE = "Kartenzahlung"
 
     # --- German Translation and Detail Formatting ---
     tree_stand_status = "Ja" if order.tree_stand else "Nein"
