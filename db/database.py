@@ -7,10 +7,7 @@ from db.schema import Base
 # -----------------------------
 # Source DB (SQLite)
 # -----------------------------
-SQLITE_DATABASE_URL = os.getenv(
-    "SQLITE_DATABASE_URL",
-    "sqlite:///./orders.db"
-)
+SQLITE_DATABASE_URL = "sqlite:///./orders.db"
 
 sqlite_engine = create_engine(
     SQLITE_DATABASE_URL,
