@@ -1,8 +1,8 @@
-from db.database import get_sqlite_db, get_postgres_db
+from db.database import get_sqlite_db, get_db
 from db.schema import OrderDB
 
 def migrate_orders():
-    with get_sqlite_db() as sqlite_db, get_postgres_db() as pg_db:
+    with get_sqlite_db() as sqlite_db, get_db() as pg_db:
         orders = sqlite_db.query(OrderDB).all()
 
         for order in orders:
