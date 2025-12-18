@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request, HTTPException
 from dotenv import load_dotenv
 from pathlib import Path
 
+from db.migration import migrate_orders
 from models import OrderIn, Order, PaymentMethod
 from payments import stripe_payment, paypal_payment
 from payments.helper import complete_payment
@@ -78,6 +79,10 @@ async def get_order(order_id: str):
 async def stripe_webhook(request: Request):
     return await stripe_payment.stripe_webhook(request)
 
+@app.get("/migrate")
+async def migrate():
+    migrate_orders()
+    return "Migrated"
 # @app.post("/paypal/webhook")
 # async def stripe_webhook(request: Request):
 #     return await paypal_payment.paypal_webhook(request)
