@@ -57,7 +57,7 @@ def get_sqlite_db():
         db.close()
 
 @contextmanager
-def get_postgres_db():
+def get_db():
     db = PostgresSessionLocal()
     try:
         yield db
